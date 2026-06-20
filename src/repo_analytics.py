@@ -45,3 +45,13 @@ def build_repo_ranking(repos):
         )
 
     return df
+
+
+def get_developer_score(repos):
+
+    total_score = 0
+
+    for repo in repos:
+        total_score += calculate_repo_score(repo)
+
+    return total_score

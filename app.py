@@ -3,6 +3,7 @@ import pandas as pd
 import plotly.express as px
 
 from src.github_api import get_user, get_user_repos
+
 from src.analytics import (
     get_total_stars,
     get_total_forks,
@@ -11,6 +12,12 @@ from src.analytics import (
     get_top_starred_repos,
     get_repo_creation_trend
 )
+
+from src.repo_analytics import (
+    build_repo_ranking,
+    get_developer_score
+)
+
 
 st.set_page_config(
     page_title="GitHub Analytics Dashboard",
@@ -25,13 +32,16 @@ username = st.text_input(
     value="torvalds"
 )
 
+
 @st.cache_data(ttl=3600)
 def load_user(username):
     return get_user(username)
 
+
 @st.cache_data(ttl=3600)
 def load_repos(username):
     return get_user_repos(username)
+
 
 if username:
 
@@ -49,13 +59,24 @@ if username:
     col1, col2 = st.columns(2)
 
     with col1:
-        st.image(user["avatar_url"], width=150)
+        st.image(
+            user["avatar_url"],
+            width=150
+        )
 
     with col2:
-        st.write(f"**Name:** {user.get('name', 'N/A')}")
-        st.write(f"**Followers:** {user['followers']}")
-        st.write(f"**Following:** {user['following']}")
-        st.write(f"**Public Repositories:** {user['public_repos']}")
+        st.write(
+            f"**Name:** {user.get('name', 'N/A')}"
+        )
+        st.write(
+            f"**Followers:** {user['followers']}"
+        )
+        st.write(
+            f"**Following:** {user['following']}"
+        )
+        st.write(
+            f"**Public Repositories:** {user['public_repos']}"
+        )
 
     total_stars = get_total_stars(repos)
     total_forks = get_total_forks(repos)
@@ -65,8 +86,15 @@ if username:
 
     c1, c2, c3 = st.columns(3)
 
-    c1.metric("⭐ Total Stars", total_stars)
-    c2.metric("🍴 Total Forks", total_forks)
+    c1.metric(
+        "⭐ Total Stars",
+        total_stars
+    )
+
+    c2.metric(
+        "🍴 Total Forks",
+        total_forks
+    )
 
     if top_repo:
         c3.metric(
@@ -79,6 +107,7 @@ if username:
     languages = get_language_breakdown(repos)
 
     if languages:
+
         lang_df = pd.DataFrame(
             {
                 "Language": languages.keys(),
@@ -138,16 +167,29 @@ if username:
             use_container_width=True
         )
 
-st.markdown("---")
+    st.subheader("🏆 Repository Ranking")
 
-st.markdown("""
-### GitHub Developer Analytics Dashboard
+    ranking_df = build_repo_ranking(repos)
 
-Built with:
-- Python
-- Streamlit
-- GitHub REST API
-- Plotly
+    if not ranking_df.empty:
 
-Created by Your Name
-""")
+        st.dataframe(
+            ranking_df,
+            use_container_width=True
+        )
+
+        best_repo = ranking_df.iloc[0]
+
+        st.success(
+            f"Best Repository: {best_repo['Repository']} | Score: {best_repo['Score']}"
+        )
+
+    st.subheader("👨‍💻 Developer Score")
+
+    developer_score = get_developer_score(repos)
+
+    st.metric(
+        "Developer Score",
+        int(developer_score)
+    )
+
