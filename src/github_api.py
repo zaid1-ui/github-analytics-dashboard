@@ -3,8 +3,10 @@ import requests
 BASE_URL = "https://api.github.com"
 
 
-def get_user_data(username):
-    response = requests.get(f"{BASE_URL}/users/{username}")
+def get_user(username):
+    response = requests.get(
+        f"{BASE_URL}/users/{username}"
+    )
 
     if response.status_code == 200:
         return response.json()
@@ -12,7 +14,7 @@ def get_user_data(username):
     return None
 
 
-def get_user_repos(username):
+def get_repos(username):
     response = requests.get(
         f"{BASE_URL}/users/{username}/repos?per_page=100"
     )

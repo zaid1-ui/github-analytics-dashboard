@@ -2,111 +2,68 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 
-from src.github_api import (
-    get_user_data,
-    get_user_repos
-)
-
+from src.github_api import get_user, get_repos
 from src.analytics import (
     get_total_stars,
     get_total_forks,
-    get_top_repo,
-    get_language_breakdown,
-    get_top_starred_repos,
-    get_repo_creation_trend
+    get_language_distribution,
 )
+from src.repo_analytics import build_repo_ranking
 
 st.set_page_config(
     page_title="GitHub Analytics Dashboard",
-    page_icon="📊",
     layout="wide"
 )
 
-st.title("📊 GitHub Analytics Dashboard")
+st.title("🚀 GitHub Analytics Dashboard")
 
 username = st.text_input(
-    "GitHub Username",
-    value="torvalds"
+    "Enter GitHub Username",
+    "torvalds"
 )
 
 if st.button("Analyze"):
 
-    user = get_user_data(username)
-    repos = get_user_repos(username)
+    user = get_user(username)
+    repos = get_repos(username)
 
-    if user is None:
+    if "message" in user:
         st.error("User not found")
         st.stop()
 
-    col1, col2 = st.columns([1, 3])
-
-    with col1:
-        st.image(user["avatar_url"], width=150)
-
-    with col2:
-        st.subheader(
-            user["name"] if user["name"] else username
-        )
-
-        st.write(
-            user["bio"] if user["bio"]
-            else "No bio available"
-        )
-
-        st.write(
-            f"Followers: {user['followers']}"
-        )
-
-        st.write(
-            f"Public Repositories: {user['public_repos']}"
-        )
+    st.success(f"Analyzing {username}")
 
     total_stars = get_total_stars(repos)
     total_forks = get_total_forks(repos)
-    top_repo = get_top_repo(repos)
 
-    c1, c2, c3, c4 = st.columns(4)
+    col1, col2, col3 = st.columns(3)
 
-    c1.metric(
-        "⭐ Total Stars",
-        total_stars
-    )
+    with col1:
+        st.metric("Repositories", len(repos))
 
-    c2.metric(
-        "🍴 Total Forks",
-        total_forks
-    )
+    with col2:
+        st.metric("Stars", total_stars)
 
-    c3.metric(
-        "📦 Repositories",
-        len(repos)
-    )
-
-    c4.metric(
-        "🏆 Top Repo",
-        top_repo["name"] if top_repo else "-"
-    )
+    with col3:
+        st.metric("Forks", total_forks)
 
     st.divider()
 
-    st.subheader(
-        "💻 Language Distribution"
-    )
+    repo_df = pd.DataFrame([
+        {
+            "Repository": repo["name"],
+            "Stars": repo["stargazers_count"]
+        }
+        for repo in repos
+    ])
 
-    language_data = get_language_breakdown(repos)
+    if not repo_df.empty:
 
-    if language_data:
-
-        lang_df = pd.DataFrame({
-            "Language": list(language_data.keys()),
-            "Count": list(language_data.values())
-        })
-
-        fig = px.pie(
-            lang_df,
-            names="Language",
-            values="Count",
-            hole=0.4
+        fig = px.bar(
+            repo_df,
+            x="Repository",
+            y="Stars",
+            title="Stars Per Repository"
         )
 
         st.plotly_chart(
@@ -114,57 +71,71 @@ if st.button("Analyze"):
             use_container_width=True
         )
 
-    st.subheader(
-        "⭐ Top Repositories"
-    )
+    st.divider()
 
-    repo_df = get_top_starred_repos(repos)
+    language_data = get_language_distribution(repos)
 
-    fig = px.bar(
-        repo_df,
-        x="Repository",
-        y="Stars",
-        color="Stars"
-    )
+    if language_data:
 
-    st.plotly_chart(
-        fig,
-        use_container_width=True
-    )
+        language_df = pd.DataFrame(
+            list(language_data.items()),
+            columns=["Language", "Count"]
+        )
 
-    st.subheader(
-        "📈 Repository Growth"
-    )
+        fig2 = px.pie(
+            language_df,
+            names="Language",
+            values="Count",
+            title="Language Distribution"
+        )
 
-    trend_df = get_repo_creation_trend(repos)
+        st.plotly_chart(
+            fig2,
+            use_container_width=True
+        )
 
-    fig = px.line(
-        trend_df,
-        x="date",
-        y="count",
-        markers=True
-    )
+    st.divider()
 
-    st.plotly_chart(
-        fig,
-        use_container_width=True
-    )
+    st.subheader("🏆 Repository Leaderboard")
 
-    st.subheader(
-        "📋 Repository Details"
-    )
-
-    repo_table = pd.DataFrame([
-        {
-            "Repository": repo["name"],
-            "Language": repo["language"],
-            "Stars": repo["stargazers_count"],
-            "Forks": repo["forks_count"]
-        }
-        for repo in repos
-    ])
+    ranking_df = build_repo_ranking(repos)
 
     st.dataframe(
-        repo_table,
+        ranking_df,
         use_container_width=True
     )
+
+    st.download_button(
+        label="📥 Download Ranking CSV",
+        data=ranking_df.to_csv(index=False),
+        file_name="github_repo_ranking.csv",
+        mime="text/csv"
+    )
+
+    if not ranking_df.empty:
+
+        st.divider()
+
+        st.subheader("⭐ Top Repository")
+
+        top_repo = ranking_df.iloc[0]
+
+        c1, c2, c3 = st.columns(3)
+
+        with c1:
+            st.metric(
+                "Repository",
+                top_repo["Repository"]
+            )
+
+        with c2:
+            st.metric(
+                "Stars",
+                int(top_repo["Stars"])
+            )
+
+        with c3:
+            st.metric(
+                "Score",
+                int(top_repo["Score"])
+            )
