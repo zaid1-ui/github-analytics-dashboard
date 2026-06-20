@@ -3,252 +3,168 @@ import pandas as pd
 import plotly.express as px
 
 from src.github_api import (
-    get_user,
-    get_repos,
-    get_repo,
-    get_contributors,
-    get_languages
+    get_user_data,
+    get_user_repos
 )
 
 from src.analytics import (
-    get_language_stats,
-    get_top_starred_repos
-)
-
-from src.repo_analytics import (
-    contributor_dataframe,
-    language_dataframe,
-    calculate_health_score
+    get_total_stars,
+    get_total_forks,
+    get_top_repo,
+    get_language_breakdown,
+    get_top_starred_repos,
+    get_repo_creation_trend
 )
 
 st.set_page_config(
     page_title="GitHub Analytics Dashboard",
+    page_icon="📊",
     layout="wide"
 )
 
-st.title(
-    "🚀 GitHub Developer Analytics Dashboard"
-)
-
-# ----------------------------------
-# USER ANALYTICS
-# ----------------------------------
-
-st.header("👤 User Analytics")
+st.title("📊 GitHub Analytics Dashboard")
 
 username = st.text_input(
     "GitHub Username",
-    placeholder="torvalds"
+    value="torvalds"
 )
 
-if st.button("Analyze User"):
+if st.button("Analyze"):
 
-    user = get_user(username)
+    user = get_user_data(username)
+    repos = get_user_repos(username)
 
-    if "message" in user:
-
+    if user is None:
         st.error("User not found")
+        st.stop()
 
-    else:
+    col1, col2 = st.columns([1, 3])
 
-        repos = get_repos(username)
+    with col1:
+        st.image(user["avatar_url"], width=150)
 
-        c1, c2, c3, c4 = st.columns(4)
-
-        c1.metric(
-            "Followers",
-            user["followers"]
-        )
-
-        c2.metric(
-            "Following",
-            user["following"]
-        )
-
-        c3.metric(
-            "Public Repos",
-            user["public_repos"]
-        )
-
-        c4.metric(
-            "Created",
-            user["created_at"][:10]
-        )
-
-        st.subheader("Profile")
-
-        st.write(
-            f"**Name:** {user.get('name')}"
+    with col2:
+        st.subheader(
+            user["name"] if user["name"] else username
         )
 
         st.write(
-            f"**Bio:** {user.get('bio')}"
+            user["bio"] if user["bio"]
+            else "No bio available"
         )
 
-        language_stats = get_language_stats(
-            repos
+        st.write(
+            f"Followers: {user['followers']}"
         )
 
-        if language_stats:
-
-            lang_df = pd.DataFrame(
-                {
-                    "Language":
-                    language_stats.keys(),
-
-                    "Count":
-                    language_stats.values()
-                }
-            )
-
-            fig = px.pie(
-                lang_df,
-                names="Language",
-                values="Count",
-                title="Language Usage"
-            )
-
-            st.plotly_chart(
-                fig,
-                use_container_width=True
-            )
-
-        top_repos = get_top_starred_repos(
-            repos
+        st.write(
+            f"Public Repositories: {user['public_repos']}"
         )
 
-        repo_df = pd.DataFrame(
-            [
-                {
-                    "Repository":
-                    repo["name"],
+    total_stars = get_total_stars(repos)
+    total_forks = get_total_forks(repos)
+    top_repo = get_top_repo(repos)
 
-                    "Stars":
-                    repo["stargazers_count"]
-                }
-                for repo in top_repos
-            ]
-        )
+    c1, c2, c3, c4 = st.columns(4)
 
-        fig2 = px.bar(
-            repo_df,
-            x="Repository",
-            y="Stars",
-            title="Top Starred Repositories"
+    c1.metric(
+        "⭐ Total Stars",
+        total_stars
+    )
+
+    c2.metric(
+        "🍴 Total Forks",
+        total_forks
+    )
+
+    c3.metric(
+        "📦 Repositories",
+        len(repos)
+    )
+
+    c4.metric(
+        "🏆 Top Repo",
+        top_repo["name"] if top_repo else "-"
+    )
+
+    st.divider()
+
+    st.subheader(
+        "💻 Language Distribution"
+    )
+
+    language_data = get_language_breakdown(repos)
+
+    if language_data:
+
+        lang_df = pd.DataFrame({
+            "Language": list(language_data.keys()),
+            "Count": list(language_data.values())
+        })
+
+        fig = px.pie(
+            lang_df,
+            names="Language",
+            values="Count",
+            hole=0.4
         )
 
         st.plotly_chart(
-            fig2,
+            fig,
             use_container_width=True
         )
 
-# ----------------------------------
-# REPOSITORY ANALYTICS
-# ----------------------------------
+    st.subheader(
+        "⭐ Top Repositories"
+    )
 
-st.divider()
+    repo_df = get_top_starred_repos(repos)
 
-st.header("📦 Repository Analytics")
+    fig = px.bar(
+        repo_df,
+        x="Repository",
+        y="Stars",
+        color="Stars"
+    )
 
-repository = st.text_input(
-    "Repository",
-    placeholder="microsoft/vscode"
-)
+    st.plotly_chart(
+        fig,
+        use_container_width=True
+    )
 
-if st.button("Analyze Repository"):
+    st.subheader(
+        "📈 Repository Growth"
+    )
 
-    try:
+    trend_df = get_repo_creation_trend(repos)
 
-        owner, repo = repository.split("/")
+    fig = px.line(
+        trend_df,
+        x="date",
+        y="count",
+        markers=True
+    )
 
-        repo_data = get_repo(
-            owner,
-            repo
-        )
+    st.plotly_chart(
+        fig,
+        use_container_width=True
+    )
 
-        contributors = get_contributors(
-            owner,
-            repo
-        )
+    st.subheader(
+        "📋 Repository Details"
+    )
 
-        languages = get_languages(
-            owner,
-            repo
-        )
+    repo_table = pd.DataFrame([
+        {
+            "Repository": repo["name"],
+            "Language": repo["language"],
+            "Stars": repo["stargazers_count"],
+            "Forks": repo["forks_count"]
+        }
+        for repo in repos
+    ])
 
-        c1, c2, c3, c4 = st.columns(4)
-
-        c1.metric(
-            "Stars",
-            repo_data["stargazers_count"]
-        )
-
-        c2.metric(
-            "Forks",
-            repo_data["forks_count"]
-        )
-
-        c3.metric(
-            "Open Issues",
-            repo_data["open_issues_count"]
-        )
-
-        c4.metric(
-            "Watchers",
-            repo_data["watchers_count"]
-        )
-
-        health_score = calculate_health_score(
-            repo_data["stargazers_count"],
-            repo_data["forks_count"],
-            len(contributors),
-            repo_data["open_issues_count"]
-        )
-
-        st.success(
-            f"Repository Health Score: {health_score}"
-        )
-
-        contributor_df = (
-            contributor_dataframe(
-                contributors[:10]
-            )
-        )
-
-        if not contributor_df.empty:
-
-            fig3 = px.bar(
-                contributor_df,
-                x="Contributor",
-                y="Contributions",
-                title="Top Contributors"
-            )
-
-            st.plotly_chart(
-                fig3,
-                use_container_width=True
-            )
-
-        lang_df = language_dataframe(
-            languages
-        )
-
-        if not lang_df.empty:
-
-            fig4 = px.pie(
-                lang_df,
-                names="Language",
-                values="Bytes",
-                title="Repository Language Distribution"
-            )
-
-            st.plotly_chart(
-                fig4,
-                use_container_width=True
-            )
-
-    except Exception:
-
-        st.error(
-            "Repository format should be owner/repository"
-        )
+    st.dataframe(
+        repo_table,
+        use_container_width=True
+    )

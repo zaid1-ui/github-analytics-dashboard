@@ -3,36 +3,21 @@ import requests
 BASE_URL = "https://api.github.com"
 
 
-def get_user(username):
+def get_user_data(username):
+    response = requests.get(f"{BASE_URL}/users/{username}")
+
+    if response.status_code == 200:
+        return response.json()
+
+    return None
+
+
+def get_user_repos(username):
     response = requests.get(
-        f"{BASE_URL}/users/{username}"
+        f"{BASE_URL}/users/{username}/repos?per_page=100"
     )
-    return response.json()
 
+    if response.status_code == 200:
+        return response.json()
 
-def get_repos(username):
-    response = requests.get(
-        f"{BASE_URL}/users/{username}/repos"
-    )
-    return response.json()
-
-
-def get_repo(owner, repo):
-    response = requests.get(
-        f"{BASE_URL}/repos/{owner}/{repo}"
-    )
-    return response.json()
-
-
-def get_contributors(owner, repo):
-    response = requests.get(
-        f"{BASE_URL}/repos/{owner}/{repo}/contributors"
-    )
-    return response.json()
-
-
-def get_languages(owner, repo):
-    response = requests.get(
-        f"{BASE_URL}/repos/{owner}/{repo}/languages"
-    )
-    return response.json()
+    return []
