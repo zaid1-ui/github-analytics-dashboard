@@ -2,50 +2,106 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 
-from src.github_api import get_user, get_repos
+from src.github_api import (
+    get_user,
+    get_repos
+)
+
 from src.analytics import (
     get_total_stars,
     get_total_forks,
     get_language_distribution,
+    get_top_repo,
+    get_repo_creation_trend
 )
-from src.repo_analytics import build_repo_ranking
+
+from src.repo_analytics import (
+    build_repo_ranking
+)
 
 st.set_page_config(
     page_title="GitHub Analytics Dashboard",
     layout="wide"
 )
 
-st.title("🚀 GitHub Analytics Dashboard")
+st.title("🚀 GitHub Developer Analytics Dashboard")
 
 username = st.text_input(
-    "Enter GitHub Username",
+    "GitHub Username",
     "torvalds"
 )
 
 if st.button("Analyze"):
 
     user = get_user(username)
-    repos = get_repos(username)
 
-    if "message" in user:
+    if not user:
         st.error("User not found")
         st.stop()
 
-    st.success(f"Analyzing {username}")
+    repos = get_repos(username)
+
+    st.success(
+        f"Analysis Complete for {username}"
+    )
+
+    st.image(
+        user["avatar_url"],
+        width=150
+    )
+
+    st.subheader(user["name"] or username)
+
+    col1, col2, col3, col4 = st.columns(4)
+
+    with col1:
+        st.metric(
+            "Followers",
+            user["followers"]
+        )
+
+    with col2:
+        st.metric(
+            "Following",
+            user["following"]
+        )
+
+    with col3:
+        st.metric(
+            "Public Repos",
+            user["public_repos"]
+        )
+
+    with col4:
+        st.metric(
+            "Account Created",
+            user["created_at"][:10]
+        )
+
+    st.divider()
 
     total_stars = get_total_stars(repos)
     total_forks = get_total_forks(repos)
 
-    col1, col2, col3 = st.columns(3)
+    c1, c2, c3 = st.columns(3)
 
-    with col1:
-        st.metric("Repositories", len(repos))
+    with c1:
+        st.metric(
+            "Total Repositories",
+            len(repos)
+        )
 
-    with col2:
-        st.metric("Stars", total_stars)
+    with c2:
+        st.metric(
+            "Total Stars",
+            total_stars
+        )
 
-    with col3:
-        st.metric("Forks", total_forks)
+    with c3:
+        st.metric(
+            "Total Forks",
+            total_forks
+        )
 
     st.divider()
 
@@ -73,13 +129,18 @@ if st.button("Analyze"):
 
     st.divider()
 
-    language_data = get_language_distribution(repos)
+    languages = get_language_distribution(
+        repos
+    )
 
-    if language_data:
+    if languages:
 
         language_df = pd.DataFrame(
-            list(language_data.items()),
-            columns=["Language", "Count"]
+            list(languages.items()),
+            columns=[
+                "Language",
+                "Count"
+            ]
         )
 
         fig2 = px.pie(
@@ -96,9 +157,34 @@ if st.button("Analyze"):
 
     st.divider()
 
-    st.subheader("🏆 Repository Leaderboard")
+    trend_df = get_repo_creation_trend(
+        repos
+    )
 
-    ranking_df = build_repo_ranking(repos)
+    if not trend_df.empty:
+
+        fig3 = px.line(
+            trend_df,
+            x="date",
+            y="Repositories",
+            markers=True,
+            title="Repository Creation Trend"
+        )
+
+        st.plotly_chart(
+            fig3,
+            use_container_width=True
+        )
+
+    st.divider()
+
+    ranking_df = build_repo_ranking(
+        repos
+    )
+
+    st.subheader(
+        "🏆 Repository Leaderboard"
+    )
 
     st.dataframe(
         ranking_df,
@@ -106,36 +192,40 @@ if st.button("Analyze"):
     )
 
     st.download_button(
-        label="📥 Download Ranking CSV",
-        data=ranking_df.to_csv(index=False),
-        file_name="github_repo_ranking.csv",
-        mime="text/csv"
+        "📥 Download CSV",
+        ranking_df.to_csv(
+            index=False
+        ),
+        "repository_ranking.csv",
+        "text/csv"
     )
 
-    if not ranking_df.empty:
+    st.divider()
 
-        st.divider()
+    top_repo = get_top_repo(repos)
 
-        st.subheader("⭐ Top Repository")
+    if top_repo:
 
-        top_repo = ranking_df.iloc[0]
+        st.subheader(
+            "⭐ Most Starred Repository"
+        )
 
         c1, c2, c3 = st.columns(3)
 
         with c1:
             st.metric(
                 "Repository",
-                top_repo["Repository"]
+                top_repo["name"]
             )
 
         with c2:
             st.metric(
                 "Stars",
-                int(top_repo["Stars"])
+                top_repo["stargazers_count"]
             )
 
         with c3:
             st.metric(
-                "Score",
-                int(top_repo["Score"])
+                "Forks",
+                top_repo["forks_count"]
             )
