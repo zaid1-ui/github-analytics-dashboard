@@ -6,29 +6,36 @@ def calculate_repo_score(repo):
     stars = repo["stargazers_count"]
     forks = repo["forks_count"]
     watchers = repo["watchers_count"]
+    issues = repo["open_issues_count"]
 
-    return (
+    score = (
         stars * 5
         + forks * 3
         + watchers
+        - issues
     )
+
+    return score
 
 
 def build_repo_ranking(repos):
 
-    ranking = []
+    data = []
 
     for repo in repos:
 
-        ranking.append({
-            "Repository": repo["name"],
-            "Stars": repo["stargazers_count"],
-            "Forks": repo["forks_count"],
-            "Watchers": repo["watchers_count"],
-            "Score": calculate_repo_score(repo)
-        })
+        data.append(
+            {
+                "Repository": repo["name"],
+                "Stars": repo["stargazers_count"],
+                "Forks": repo["forks_count"],
+                "Watchers": repo["watchers_count"],
+                "Issues": repo["open_issues_count"],
+                "Score": calculate_repo_score(repo)
+            }
+        )
 
-    df = pd.DataFrame(ranking)
+    df = pd.DataFrame(data)
 
     if not df.empty:
 

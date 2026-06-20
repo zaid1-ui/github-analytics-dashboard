@@ -14,7 +14,7 @@ def get_user(username):
     return None
 
 
-def get_repos(username):
+def get_user_repos(username):
     response = requests.get(
         f"{BASE_URL}/users/{username}/repos?per_page=100"
     )
